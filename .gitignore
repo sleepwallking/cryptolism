@@ -1,0 +1,10 @@
+/venv
+/output
+/dist
+/check_code
+/tests
+cryptolism_todo.txt
+code_for_rewrite.txt
+main.spec
+pairs.json
+.env
