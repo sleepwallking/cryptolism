@@ -7,8 +7,8 @@ class IconButton(customtkinter.CTkButton):
         super().__init__(master, image=icon, text="", command=command, **kwargs)
 
 graphs_and_icons = {
-            'line':"img/chart_w.png",
-            'candlestick':"img/candlestick_w.png",
+            'линейный':"img/chart_w.png",
+            'свечной':"img/candlestick_w.png",
             'macd':"img/macd_w.png",
             'sma':"img/sma_w.png",
             'ema':"img/ema_w.png",

@@ -8,8 +8,7 @@ import pandas as pd
 import mplfinance as mpf
 from datetime import datetime
 from CTkMessagebox import CTkMessagebox
-
-from settings.config import ohlc_avaible_timeframes
+from settings.config import ohlc_timeframes, ohlc_themes
 from utils.controls import IconButton, graphs_and_icons
 from api.coingecko import CoingeckoAPI
 from settings.current_state import current_state
@@ -26,14 +25,15 @@ customtkinter.set_appearance_mode("dark")
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-
-        self.geometry("1800x900")
+        self.geometry("1920x1080")
         self.title("Cryptolism")
         self.iconbitmap("img/cryptolism.ico")
         self.padding = 5
         self.icon_size = 40
-        plt.style.use('dark_background')
         self.font_bold = ("Segoe UI", 18, "normal")
+
+
+        plt.style.use('dark_background')
 
         # Панели
         self.top_frame = customtkinter.CTkFrame(self, height=30)
@@ -50,7 +50,9 @@ class App(customtkinter.CTk):
 
         self.grid_columnconfigure(1, weight=1)
 
-        # Кнопки верхней панели
+
+
+        # Верхняя панель (Настройки приложения)
 
         def switch_event():
             theme = switch_var.get()
@@ -63,7 +65,7 @@ class App(customtkinter.CTk):
                 plt.style.use('dark_background')
                 current_state.theme = 'dark'
 
-            self.open_coin_window(current_state.coin)
+            self.set_coin(current_state.coin)
 
 
         switch_var = customtkinter.StringVar(value="dark")
@@ -71,60 +73,44 @@ class App(customtkinter.CTk):
                                         variable=switch_var, onvalue="dark", offvalue="light")
         self.switch.grid(row=0, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        def combobox_callback(choice):
-            print("combobox dropdown clicked:", choice)
-
-        self.change_api = customtkinter.CTkComboBox(self.top_frame, values=["coingecko", "binance", "bybit", "okx"],
-                                     command=combobox_callback)
-
-        self.change_api.grid(row=0, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
 
 
-        # Кнопки левой стороны (инструменты для графика)
+
+        # Левая панель (Инструменты для графика)
+
         for graph_type in graphs_and_icons:
-            self.graph_button = IconButton(self.left_frame, graphs_and_icons[graph_type], partial(self.set_graph_type, graph_type),
-                                            width=self.icon_size, height=self.icon_size)
+            self.graph_button = IconButton(self.left_frame, graphs_and_icons[graph_type], partial(self.set_graph, graph_type),
+                                           width=self.icon_size, height=self.icon_size)
             self.graph_button.pack(padx=self.padding, pady=self.padding)
 
-        # Фрейм для центральных кнопок
 
-        self.center_frame_graph = customtkinter.CTkFrame(self.center_frame)
-        self.center_frame_graph.grid(row=0, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.coin_frame = customtkinter.CTkFrame(self.center_frame_graph, height=800)
-        self.coin_frame.grid(row=0, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.coin_label = customtkinter.CTkLabel(self.coin_frame, font=self.font_bold)
-        self.coin_label.grid(row=0, column=0, padx=self.padding+10, pady=self.padding, sticky="W")
+        # Центральная панель (График)
 
-        self.center_frame_buttons = customtkinter.CTkFrame(self.coin_frame)
+        self.center_info_label = customtkinter.CTkLabel(self.center_frame, font=self.font_bold)
+        self.center_info_label.grid(row=0, column=0, padx=self.padding+10, pady=self.padding, sticky="W")
+
+        self.center_frame_buttons = customtkinter.CTkFrame(self.center_frame)
         self.center_frame_buttons.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew", columnspan=4)
 
-
-
-
-
-
-
-
-        for i, timeframe in enumerate(ohlc_avaible_timeframes):
+        for i, timeframe in enumerate(ohlc_timeframes):
             self.timeframe_button = customtkinter.CTkButton(self.center_frame_buttons, text=f"{timeframe} дн.",
-                                                                command=partial(self.plot_the_period, timeframe))
+                                                            command=partial(self.set_period, timeframe))
             self.timeframe_button.grid(row=0, column=i, padx=self.padding, pady=self.padding)
-
 
         self.time_search_entry = customtkinter.CTkEntry(self.center_frame_buttons, placeholder_text="Ввести диапазон: ")
         self.time_search_entry.grid(row=0, column=4, padx=self.padding, pady=self.padding)
 
-        self.time_search_button = customtkinter.CTkButton(self.center_frame_buttons, text="Найти", command=lambda: self.check_entry_int_value())
+        self.time_search_button = customtkinter.CTkButton(self.center_frame_buttons, text="Найти", command=lambda: self.set_period(
+            int(self.time_search_entry.get())))
         self.time_search_button.grid(row=0, column=5, padx=self.padding, pady=self.padding)
 
-        self.cache_for_prices = {} # {'bitcoin7': [price1, price2, price3, price..., pricex], 'ethereum7': [price1, price2, price3, price..., pricex], 'coinx': [etc...]}
-        self.open_coin_window('bitcoin')
 
-        # Кнопки правой стороны (список монет)
 
-        self.coin_list_label = customtkinter.CTkLabel(self.right_frame, text='Список валют')
+        # Правая панель (Список монет)
+
+        self.coin_list_label = customtkinter.CTkLabel(self.right_frame, text='Список криптовалют')
         self.coin_list_label.grid(row=0, column=0)
 
         self.coin_search_entry = customtkinter.CTkEntry(self.right_frame, placeholder_text="Найти монету:")
@@ -140,14 +126,14 @@ class App(customtkinter.CTk):
 
         for i, coin in enumerate(coins):
             self.coin_button = customtkinter.CTkButton(self.coins_list_frame, width=180, text=truncate_string(coin),
-                                                       command=partial(self.open_coin_window, coin))
+                                                       command=partial(self.set_coin, coin))
             self.coin_button.grid(row=i, column=0, padx=self.padding, pady=self.padding)
             self.coins_buttons.append(self.coin_button)
 
+        # Создание кэша и открытие графика
 
-
-
-
+        self.cache_for_prices = {}  # {'bitcoin7': [price1, price2, price3, price..., pricex], 'ethereum7': [price1, price2, price3, price..., pricex], 'coinx': [etc...]}
+        self.set_coin('bitcoin')
 
 
     def filter_buttons(self, event):
@@ -171,28 +157,23 @@ class App(customtkinter.CTk):
             else:
                 btn.grid_remove()  # Скрываем (но сохраняем настройки grid)
 
-    def check_entry_int_value(self):
-        value = int(self.time_search_entry.get())
-        if current_state.graph_type == "candlestick" and value not in ohlc_avaible_timeframes:
-            ...
-        else:
-            self.plot_the_period(value)
 
 
-    def set_graph_type(self, graph_type: str):
-        current_state.graph_type = graph_type
+
+
+    def set_graph(self, graph):
+        current_state.graph = graph
         self.get_coin(current_state.coin, current_state.period)
 
-    def open_coin_window(self, coin):
+    def set_coin(self, coin):
         current_state.coin = coin
-        self.get_coin(coin)
+        self.get_coin(current_state.coin, current_state.period)
 
-
-
-    def plot_the_period(self, days):
-        coin = current_state.coin
+    def set_period(self, days):
         current_state.period = days
-        self.get_coin(coin, days)
+        self.get_coin(current_state.coin, current_state.period)
+
+
 
     def plot_macd(self, prices):
         """Рассчитывает и отображает индикатор MACD"""
@@ -220,9 +201,9 @@ class App(customtkinter.CTk):
         ys = prices
         graph_color = 'green' if ys[0] < ys[-1] else 'red'
 
-        if current_state.graph_type == 'scatter':
+        if current_state.graph == 'scatter':
             ax1.scatter(xs, ys, color=graph_color)
-        elif current_state.graph_type == 'bar':
+        elif current_state.graph == 'bar':
             ax1.bar(xs, ys, color=graph_color)
             ax1.set_ylim(min(ys) * 0.95, max(ys) * 1.05)
         else:
@@ -312,7 +293,7 @@ class App(customtkinter.CTk):
         ax2.axhline(70, color='red', linestyle='--')
         ax2.axhline(30, color='green', linestyle='--')
         ax2.set_ylim(0, 100)
-        ax2.set_title('RSI (14 дней)')
+        ax2.set_title(f'RSI {current_state.period}')
         ax2.legend()
 
         return figure
@@ -336,7 +317,7 @@ class App(customtkinter.CTk):
         price = Decimal(str(ys[-1]))
         price = price.quantize(Decimal("1.00"))
 
-        self.coin_label.configure(text=f'{coin} | Текущая цена: {price}$')
+
 
         figure = plt.figure(figsize=(16, 7))
         figure.tight_layout()
@@ -345,11 +326,12 @@ class App(customtkinter.CTk):
         graph_color = 'green' if ys[0] < ys[-1] else 'red'
 
 
-        if current_state.graph_type == 'candlestick':
-            if days not in ohlc_avaible_timeframes:
-                days = 7
-                msg = CTkMessagebox(title="Ошибка ввода", message=f"Свечной график может отображать только недельный, месячный, полугодичный или годовой график.\nПо умолчанию выведен недельный график (7 дн.)",
+        if current_state.graph == "свечной":
+            if days not in ohlc_timeframes:
+                days = current_state.period = 7
+                msg = CTkMessagebox(title="Ошибка ввода", message=f"Свечной график может отображать только следующие периоды:\n* недельный \n* месячный \n* полугодичный \n* годовой \nПо умолчанию выведен недельный график (7 дн.)",
                                 icon="info", option_1="Отмена")
+
             ohlc = coingecko.get_ohlc_data_from_api(coin, days)
             data = []
 
@@ -359,31 +341,34 @@ class App(customtkinter.CTk):
             df = pd.DataFrame(data, columns=['Date', 'Open', 'High', 'Low', 'Close'])
             df.set_index('Date', inplace=True)
 
-            themes = {'dark':'nightclouds', 'light':'binance'}
+
 
             figure, ax = mpf.plot(
                 df,
                 type='candle',
-                style=themes[current_state.theme],
+                style=ohlc_themes[current_state.theme],
                 returnfig=True,
                 figsize=(16, 7),
                 volume=False,
             )
 
-        elif current_state.graph_type == 'macd':
+        elif current_state.graph == 'macd':
             figure = self.plot_macd(prices)
-        elif current_state.graph_type == 'sma':
+        elif current_state.graph == 'sma':
             figure = self.plot_sma(prices)
-        elif current_state.graph_type == 'ema':
+        elif current_state.graph == 'ema':
             figure = self.plot_ema(prices)
-        elif current_state.graph_type == 'rsi':
+        elif current_state.graph == 'rsi':
             figure = self.plot_rsi(prices)
         else:
             ax.plot(xs, ys, color=graph_color)
-        print(current_state.period)
-        print(days)
-        canvas = FigureCanvasTkAgg(figure, master=self.coin_frame)
+
+        self.center_info_label.configure(
+            text=f'{coin} | текущая цена: {price}$ | выбранный период: {current_state.period} дн. | график: {current_state.graph}')
+        canvas = FigureCanvasTkAgg(figure, master=self.center_frame)
         canvas.get_tk_widget().grid(row=1, column=0)
+
 
 app = App()
 app.mainloop()
+
