@@ -1,9 +1,9 @@
-/venv
-/output
-/dist
-/build
-/check_code
-/tests
+\venv
+\output
+\dist
+\build
+\check_code
+\tests
 cryptolism_todo.txt
 code_for_rewrite.txt
 main.spec
