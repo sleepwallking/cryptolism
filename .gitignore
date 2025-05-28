@@ -1,6 +1,7 @@
 /venv
 /output
 /dist
+/build
 /check_code
 /tests
 cryptolism_todo.txt

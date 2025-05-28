@@ -8,7 +8,6 @@ from decimal import Decimal
 import pandas as pd
 import mplfinance as mpf
 from datetime import datetime
-import tkinter
 
 from api.coingecko import CoingeckoAPI
 
@@ -47,10 +46,10 @@ class App(customtkinter.CTk):
         self.left_frame = customtkinter.CTkFrame(self, width=50)
         self.left_frame.grid(row=1, column=0, padx=(self.padding, 0), pady=self.padding, sticky='nsew')
 
-        self.center_frame = customtkinter.CTkScrollableFrame(self, height=1200)
+        self.center_frame = customtkinter.CTkFrame(self, height=1200)
         self.center_frame.grid(row=1, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.right_frame = customtkinter.CTkFrame(self, width=300)
+        self.right_frame = customtkinter.CTkScrollableFrame(self, width=300)
         self.right_frame.grid(row=1, column=2, padx=(0, self.padding), pady=self.padding, sticky="nsew")
 
         self.grid_columnconfigure(1, weight=1)
@@ -122,7 +121,7 @@ class App(customtkinter.CTk):
         self.center_frame_buttons = customtkinter.CTkFrame(self.coin_frame)
         self.center_frame_buttons.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew", columnspan=4)
 
-        coins = ('bitcoin', 'tether', 'ethereum', 'solana', 'ripple', 'binancecoin', 'cardano', 'litecoin', 'stellar', 'monero', 'hedera', 'okb',)
+        coins = ('bitcoin', 'ethereum')
 
         self.coin_list_label = customtkinter.CTkLabel(self.right_frame, text='Список валют', justify="center")
         self.coin_list_label.grid(row=0, column=0)
@@ -140,6 +139,43 @@ class App(customtkinter.CTk):
 
         self.cache_for_prices = {} # {'bitcoin7': [price1, price2, price3, price..., pricex], 'ethereum7': [price1, price2, price3, price..., pricex], 'coinx': [etc...]}
         self.open_coin_window('bitcoin')
+
+        coins = coingecko.get_coin_list()
+
+        self.coins_buttons = []
+
+        for i, coin in enumerate(coins):
+
+            self.coin_button = customtkinter.CTkButton(self.right_frame, text=coin,
+                                                       command=partial(self.open_coin_window, coin))
+            self.coin_button.grid(row=i + 2, column=0, padx=self.padding, pady=self.padding)
+            self.coins_buttons.append(self.coin_button)
+
+
+        self.search_entry = customtkinter.CTkEntry(self.right_frame)
+        self.search_entry.grid(row=1, column=0)
+        self.search_entry.bind("<KeyRelease>", self.filter_buttons)
+
+
+    def filter_buttons(self, event):
+        search_text = self.search_entry.get().lower()  # Получаем текст из поля
+
+        # Если поле пустое — показываем ВСЕ кнопки
+        if not search_text:
+            for i, btn in enumerate(self.coins_buttons):
+                btn.grid(row=i + 2, column=0, padx=self.padding, pady=self.padding)  # Восстанавливаем позицию
+            return
+
+        # Иначе фильтруем
+        visible_row = 2  # Начинаем с ряда 2 (как в вашем коде)
+        for btn in self.coins_buttons:
+            btn_text = btn.cget("text").lower()  # Получаем текст кнопки
+
+            if search_text in btn_text:
+                btn.grid(row=visible_row, column=0, padx=self.padding, pady=self.padding)  # Показываем
+                visible_row += 1  # Увеличиваем ряд для следующей кнопки
+            else:
+                btn.grid_remove()  # Скрываем (но сохраняем настройки grid)
 
     def set_graph_type(self, graph_type: str):
         current_state.graph_type = graph_type
