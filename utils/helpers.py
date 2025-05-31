@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from settings.config import coin_name_max_lenght
 
 def truncate_string(text):
@@ -5,6 +7,11 @@ def truncate_string(text):
         return text[:coin_name_max_lenght - 3] + "..."
     else:
         return text
+
+def get_date_from_period(days):
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days)
+    return f"{days} дн. [{start_date} - {end_date}]"
 
 
 # def check_entry_int_value(entry):

@@ -8,18 +8,19 @@ import pandas as pd
 import mplfinance as mpf
 from datetime import datetime
 from CTkMessagebox import CTkMessagebox
-from settings.config import ohlc_timeframes, ohlc_themes
+from matplotlib.pyplot import tight_layout
+
+from settings.config import ohlc_timeframes, ohlc_themes, plot_functions
 from utils.controls import IconButton, graphs_and_icons
 from api.coingecko import CoingeckoAPI
 from settings.current_state import current_state
-from utils.helpers import truncate_string
+from utils.helpers import truncate_string, get_date_from_period
+
 
 coingecko = CoingeckoAPI()
 
-
 customtkinter.set_default_color_theme("dark-blue")
 customtkinter.set_appearance_mode("dark")
-
 
 
 class App(customtkinter.CTk):
@@ -31,7 +32,7 @@ class App(customtkinter.CTk):
         self.padding = 5
         self.icon_size = 40
         self.font_bold = ("Segoe UI", 18, "normal")
-
+        self.minsize(width=900, height=460)
 
         plt.style.use('dark_background')
 
@@ -39,16 +40,17 @@ class App(customtkinter.CTk):
         self.top_frame = customtkinter.CTkFrame(self, height=30)
         self.top_frame.grid(row=0, column=0, padx=self.padding, pady=(self.padding, 0), sticky="ew", columnspan=3)
 
-        self.left_frame = customtkinter.CTkFrame(self)
+        self.left_frame = customtkinter.CTkScrollableFrame(self, width=50)
         self.left_frame.grid(row=1, column=0, padx=(self.padding, 0), pady=self.padding, sticky='nsew')
 
-        self.center_frame = customtkinter.CTkFrame(self, height=1200)
+        self.center_frame = customtkinter.CTkFrame(self)
         self.center_frame.grid(row=1, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
 
         self.right_frame = customtkinter.CTkFrame(self)
         self.right_frame.grid(row=1, column=2, padx=(0, self.padding), pady=self.padding, sticky="nsew")
 
         self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
 
 
@@ -67,7 +69,6 @@ class App(customtkinter.CTk):
 
             self.set_coin(current_state.coin)
 
-
         switch_var = customtkinter.StringVar(value="dark")
         self.switch = customtkinter.CTkSwitch(self.top_frame, text="Смена темы", command=switch_event,
                                         variable=switch_var, onvalue="dark", offvalue="light")
@@ -75,8 +76,8 @@ class App(customtkinter.CTk):
 
 
 
-
         # Левая панель (Инструменты для графика)
+        self.left_frame.grid_rowconfigure(0, weight=1)
 
         for graph_type in graphs_and_icons:
             self.graph_button = IconButton(self.left_frame, graphs_and_icons[graph_type], partial(self.set_graph, graph_type),
@@ -85,8 +86,12 @@ class App(customtkinter.CTk):
 
 
 
-
         # Центральная панель (График)
+
+        self.center_frame.grid_rowconfigure(0, weight=0)
+        self.center_frame.grid_rowconfigure(1, weight=1)
+        self.center_frame.grid_rowconfigure(2, weight=0)
+        self.center_frame.grid_columnconfigure(0, weight=1)
 
         self.center_info_label = customtkinter.CTkLabel(self.center_frame, font=self.font_bold)
         self.center_info_label.grid(row=0, column=0, padx=self.padding+10, pady=self.padding, sticky="W")
@@ -110,6 +115,8 @@ class App(customtkinter.CTk):
 
         # Правая панель (Список монет)
 
+        self.right_frame.grid_rowconfigure(2, weight=1)
+
         self.coin_list_label = customtkinter.CTkLabel(self.right_frame, text='Список криптовалют')
         self.coin_list_label.grid(row=0, column=0)
 
@@ -117,7 +124,7 @@ class App(customtkinter.CTk):
         self.coin_search_entry.grid(row=1, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
         self.coin_search_entry.bind("<KeyRelease>", self.filter_buttons)
 
-        self.coins_list_frame = customtkinter.CTkScrollableFrame(self.right_frame, height=700)
+        self.coins_list_frame = customtkinter.CTkScrollableFrame(self.right_frame, width=150)
         self.coins_list_frame.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
         coins = coingecko.get_coin_list()
@@ -125,7 +132,7 @@ class App(customtkinter.CTk):
         self.coins_buttons = []
 
         for i, coin in enumerate(coins):
-            self.coin_button = customtkinter.CTkButton(self.coins_list_frame, width=180, text=truncate_string(coin),
+            self.coin_button = customtkinter.CTkButton(self.coins_list_frame, text=truncate_string(coin),
                                                        command=partial(self.set_coin, coin))
             self.coin_button.grid(row=i, column=0, padx=self.padding, pady=self.padding)
             self.coins_buttons.append(self.coin_button)
@@ -147,7 +154,7 @@ class App(customtkinter.CTk):
             return
 
         # Иначе фильтруем
-        visible_row = 0  # Начинаем с ряда 2 (как в вашем коде)
+        visible_row = 0
         for btn in self.coins_buttons:
             btn_text = btn.cget("text").lower()  # Получаем текст кнопки
 
@@ -156,9 +163,6 @@ class App(customtkinter.CTk):
                 visible_row += 1  # Увеличиваем ряд для следующей кнопки
             else:
                 btn.grid_remove()  # Скрываем (но сохраняем настройки grid)
-
-
-
 
 
     def set_graph(self, graph):
@@ -173,130 +177,6 @@ class App(customtkinter.CTk):
         current_state.period = days
         self.get_coin(current_state.coin, current_state.period)
 
-
-
-    def plot_macd(self, prices):
-        """Рассчитывает и отображает индикатор MACD"""
-        # Преобразуем список цен в pandas Series
-        close_prices = pd.Series(prices)
-
-        # Рассчитываем EMA с периодами 12 и 26
-        ema12 = close_prices.ewm(span=12, adjust=False).mean()
-        ema26 = close_prices.ewm(span=26, adjust=False).mean()
-
-        # Линия MACD - разница между EMA12 и EMA26
-        macd_line = ema12 - ema26
-        # Сигнальная линия - EMA от MACD с периодом 9
-        signal_line = macd_line.ewm(span=9, adjust=False).mean()
-        # Гистограмма MACD - разница между MACD и сигнальной линией
-        macd_hist = macd_line - signal_line
-
-        # Создаем график
-        figure = plt.figure(figsize=(16, 7))
-        figure.tight_layout()
-
-        # Верхний график - цены
-        ax1 = figure.add_subplot(211)
-        xs = range(len(prices))
-        ys = prices
-        graph_color = 'green' if ys[0] < ys[-1] else 'red'
-
-        if current_state.graph == 'scatter':
-            ax1.scatter(xs, ys, color=graph_color)
-        elif current_state.graph == 'bar':
-            ax1.bar(xs, ys, color=graph_color)
-            ax1.set_ylim(min(ys) * 0.95, max(ys) * 1.05)
-        else:
-            ax1.plot(xs, ys, color=graph_color)
-
-        ax1.set_title(f'Цена {current_state.coin}')
-
-        # Нижний график - MACD
-        ax2 = figure.add_subplot(212)
-        ax2.plot(macd_line, label='MACD', color='blue')
-        ax2.plot(signal_line, label='Signal', color='orange')
-
-        # Гистограмма MACD
-        colors = ['green' if val >= 0 else 'red' for val in macd_hist]
-        ax2.bar(macd_hist.index, macd_hist, color=colors, alpha=0.5)
-
-        ax2.axhline(0, color='gray', linestyle='--')
-        ax2.set_title('MACD')
-        ax2.legend()
-
-        return figure
-
-    def plot_sma(self, prices, window=20):
-        """Рассчитывает и отображает Simple Moving Average"""
-        close_prices = pd.Series(prices)
-        sma = close_prices.rolling(window=window).mean()
-
-        figure = plt.figure(figsize=(16, 7))
-        ax = figure.add_subplot(111)
-
-        xs = range(len(prices))
-        ys = prices
-        graph_color = 'green' if ys[0] < ys[-1] else 'red'
-
-        ax.plot(xs, ys, label='Цена', color=graph_color)
-        ax.plot(xs, sma, label=f'SMA {window}', color='orange')
-        ax.set_title(f'Цена {current_state.coin} с SMA {window}')
-        ax.legend()
-
-        return figure
-
-    def plot_ema(self, prices, window=20):
-        """Рассчитывает и отображает Exponential Moving Average"""
-        close_prices = pd.Series(prices)
-        ema = close_prices.ewm(span=window, adjust=False).mean()
-
-        figure = plt.figure(figsize=(16, 7))
-        ax = figure.add_subplot(111)
-
-        xs = range(len(prices))
-        ys = prices
-        graph_color = 'green' if ys[0] < ys[-1] else 'red'
-
-        ax.plot(xs, ys, label='Цена', color=graph_color)
-        ax.plot(xs, ema, label=f'EMA {window}', color='purple')
-        ax.set_title(f'Цена {current_state.coin} с EMA {window}')
-        ax.legend()
-
-        return figure
-
-    def plot_rsi(self, prices, window=14):
-        """Рассчитывает и отображает Relative Strength Index"""
-        close_prices = pd.Series(prices)
-        delta = close_prices.diff()
-
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-
-        avg_gain = gain.rolling(window=window).mean()
-        avg_loss = loss.rolling(window=window).mean()
-
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-
-        figure = plt.figure(figsize=(16, 7))
-        figure.tight_layout()
-
-        ax1 = figure.add_subplot(211)
-        xs = range(len(prices))
-        ys = prices
-        graph_color = 'green' if ys[0] < ys[-1] else 'red'
-        ax1.plot(xs, ys, color=graph_color)
-        ax1.set_title(f'Цена {current_state.coin}')
-
-        ax2 = figure.add_subplot(212)
-        ax2.plot(rsi, label='RSI', color='blue')
-        ax2.axhline(70, color='red', linestyle='--')
-        ax2.axhline(30, color='green', linestyle='--')
-        ax2.set_ylim(0, 100)
-        ax2.set_title(f'RSI {current_state.period}')
-        ax2.legend()
-
-        return figure
 
     def get_coin(self, coin, days=7):
         plt.close('all')
@@ -313,23 +193,20 @@ class App(customtkinter.CTk):
         xs = range(len(prices))
         ys = prices
 
-
         price = Decimal(str(ys[-1]))
         price = price.quantize(Decimal("1.00"))
 
-
-
-        figure = plt.figure(figsize=(16, 7))
-        figure.tight_layout()
-        ax = figure.add_subplot(111)
-
+        figure = plt.figure(figsize=(18, 10), tight_layout=True)
         graph_color = 'green' if ys[0] < ys[-1] else 'red'
 
 
         if current_state.graph == "свечной":
             if days not in ohlc_timeframes:
                 days = current_state.period = 7
-                msg = CTkMessagebox(title="Ошибка ввода", message=f"Свечной график может отображать только следующие периоды:\n* недельный \n* месячный \n* полугодичный \n* годовой \nПо умолчанию выведен недельный график (7 дн.)",
+                msg = CTkMessagebox(title="Ошибка ввода", message=f"Свечной график может отображать только следующие "
+                                                                  f"периоды:\n* недельный \n* месячный \n* "
+                                                                  f"полугодичный \n* годовой \nПо умолчанию выведен "
+                                                                  f"недельный график (7 дн.)",
                                 icon="info", option_1="Отмена")
 
             ohlc = coingecko.get_ohlc_data_from_api(coin, days)
@@ -342,33 +219,26 @@ class App(customtkinter.CTk):
             df.set_index('Date', inplace=True)
 
 
-
             figure, ax = mpf.plot(
                 df,
                 type='candle',
                 style=ohlc_themes[current_state.theme],
                 returnfig=True,
-                figsize=(16, 7),
+                figsize=(18, 10),
                 volume=False,
+                tight_layout=True,
             )
-
-        elif current_state.graph == 'macd':
-            figure = self.plot_macd(prices)
-        elif current_state.graph == 'sma':
-            figure = self.plot_sma(prices)
-        elif current_state.graph == 'ema':
-            figure = self.plot_ema(prices)
-        elif current_state.graph == 'rsi':
-            figure = self.plot_rsi(prices)
-        else:
+        elif current_state.graph == 'линейный':
+            ax = figure.add_subplot(111)
             ax.plot(xs, ys, color=graph_color)
+        else:
+            figure = plot_functions[current_state.graph](prices, figure)
 
         self.center_info_label.configure(
-            text=f'{coin} | текущая цена: {price}$ | выбранный период: {current_state.period} дн. | график: {current_state.graph}')
+            text=f"{current_state.coin} | {price}$ | период: {get_date_from_period(current_state.period)} | график: {current_state.graph}")
+
         canvas = FigureCanvasTkAgg(figure, master=self.center_frame)
         canvas.get_tk_widget().grid(row=1, column=0)
 
-
 app = App()
 app.mainloop()
-
