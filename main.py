@@ -16,6 +16,7 @@ from utils.controls import IconButton, graphs_and_icons
 from api.coingecko import CoingeckoAPI
 from settings.current_state import current_state
 from utils.helpers import truncate_string, get_date_from_period, validate_input
+from utils.messages import CANDLE_CHART_ERROR_MSG, PRINT_OUT_INFO_MSG
 from windows.help import HelpWindow
 
 coingecko = CoingeckoAPI()
@@ -76,8 +77,17 @@ class App(customtkinter.CTk):
         self.switch.grid(row=0, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
         def graph_paper_out():
-            plt.savefig("graph.png")
-            os.startfile("graph.png", "print")
+            filename = f'{current_state.coin}_{current_state.period}_{current_state.graph}.png'
+
+            plt.savefig(filename)
+            os.startfile(filename, "print")
+
+            filepath = os.path.join(os.getcwd(), filename)
+            # print("Файл сохранён по пути:", filepath)
+
+            print_out_info_msg = CTkMessagebox(title="Печать графика", message=PRINT_OUT_INFO_MSG+filepath,
+                                                   icon="info", option_1="Отмена")
+
 
         self.paper_out_button = customtkinter.CTkButton(self.top_frame, command=graph_paper_out, text='Распечатать график')
         self.paper_out_button.grid(row=0, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
@@ -230,11 +240,8 @@ class App(customtkinter.CTk):
         if current_state.graph == "свечной":
             if days not in ohlc_timeframes:
                 days = current_state.period = 7
-                msg = CTkMessagebox(title="Ошибка ввода", message=f"Свечной график может отображать только следующие "
-                                                                  f"периоды:\n* недельный \n* месячный \n* "
-                                                                  f"полугодичный \n* годовой \nПо умолчанию выведен "
-                                                                  f"недельный график (7 дн.)",
-                                icon="info", option_1="Отмена")
+                candle_chart_error_msg = CTkMessagebox(title="Ошибка ввода", message=CANDLE_CHART_ERROR_MSG,
+                              icon="error", option_1="Отмена")
 
             ohlc = coingecko.get_ohlc_data_from_api(coin, days)
             data = []
