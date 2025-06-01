@@ -176,23 +176,15 @@ class App(customtkinter.CTk):
         self.cache_for_prices = {}  # {'bitcoin7': [price1, price2, price3, price..., pricex], 'ethereum7': [price1, price2, price3, price..., pricex], 'coinx': [etc...]}
         self.set_coin('bitcoin')
 
-
     def filter_buttons(self, event):
         search_text = self.coin_search_entry.get().lower()
         self.coins_list_frame._parent_canvas.yview_moveto(0)
 
-
-        if not search_text:
-            for i, btn in enumerate(self.coins_buttons):
-                btn.grid(row=i, column=0, padx=self.padding, pady=self.padding)
-            return
-
-
         visible_row = 0
         for btn in self.coins_buttons:
-            btn_text = btn.cget("text").lower()
+            matches_search = not search_text or search_text in btn.cget("text").lower()
 
-            if search_text in btn_text:
+            if matches_search:
                 btn.grid(row=visible_row, column=0, padx=self.padding, pady=self.padding)
                 visible_row += 1
             else:
@@ -218,9 +210,14 @@ class App(customtkinter.CTk):
         current_state.period = days
         self.get_coin(current_state.coin, current_state.period)
 
-
     def get_coin(self, coin, days=7):
+        # Закрываем все предыдущие графики
         plt.close('all')
+
+        # Удаляем предыдущий canvas, если он существует
+        if hasattr(self, 'current_canvas'):
+            self.current_canvas.get_tk_widget().destroy()
+
         cache_key = f'{coin}{days}'
         prices = self.cache_for_prices.get(cache_key)
 
@@ -236,12 +233,11 @@ class App(customtkinter.CTk):
         figure = plt.figure(figsize=(18, 10), tight_layout=True)
         graph_color = 'green' if ys[0] < ys[-1] else 'red'
 
-
         if current_state.graph == "свечной":
             if days not in ohlc_timeframes:
                 days = current_state.period = 7
                 candle_chart_error_msg = CTkMessagebox(title="Ошибка ввода", message=CANDLE_CHART_ERROR_MSG,
-                              icon="error", option_1="Отмена")
+                                                       icon="error", option_1="Отмена")
 
             ohlc = coingecko.get_ohlc_data_from_api(coin, days)
             data = []
@@ -251,7 +247,6 @@ class App(customtkinter.CTk):
 
             df = pd.DataFrame(data, columns=['Date', 'Open', 'High', 'Low', 'Close'])
             df.set_index('Date', inplace=True)
-
 
             figure, ax = mpf.plot(
                 df,
@@ -263,7 +258,6 @@ class App(customtkinter.CTk):
                 tight_layout=True,
             )
             figure.suptitle(f'{current_state.coin} | {price}$', fontsize=14, y=0.9, x=0.9)
-
 
         elif current_state.graph == 'линейный':
             ax = figure.add_subplot(111)
@@ -277,8 +271,9 @@ class App(customtkinter.CTk):
         self.center_info_label.configure(
             text=f"период: {get_date_from_period(current_state.period)} | график: {current_state.graph}")
 
-        canvas = FigureCanvasTkAgg(figure, master=self.center_frame)
-        canvas.get_tk_widget().grid(row=1, column=0)
+        # Сохраняем ссылку на текущий canvas
+        self.current_canvas = FigureCanvasTkAgg(figure, master=self.center_frame)
+        self.current_canvas.get_tk_widget().grid(row=1, column=0)
 
 
 
