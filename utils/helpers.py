@@ -14,6 +14,15 @@ def get_date_from_period(days):
     return f"{days} дн. [{start_date} - {end_date}]"
 
 
+def validate_input(text):
+    if not text:
+        return True
+    try:
+        num = int(text)
+        return 1 <= num <= 365
+    except ValueError:
+        return False
+
 # def check_entry_int_value(entry):
 #     try:
 #         value = int(entry.get())

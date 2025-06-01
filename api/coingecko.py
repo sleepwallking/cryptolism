@@ -50,3 +50,5 @@ class CoingeckoAPI:
         ohlc = [i for i in json_response]
 
         return ohlc
+
+coingecko = CoingeckoAPI()

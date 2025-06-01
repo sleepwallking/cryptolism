@@ -13,4 +13,5 @@ graphs_and_icons = {
             'sma':"img/sma_w.png",
             'ema':"img/ema_w.png",
             'rsi':"img/rsi_w.png",
+            'bb':"img/macd_w.png",
         }

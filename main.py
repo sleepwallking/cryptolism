@@ -1,5 +1,7 @@
+import os
 import customtkinter
 import matplotlib.pyplot as plt
+import mplcursors
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from sys import getsizeof
 from functools import partial
@@ -8,14 +10,13 @@ import pandas as pd
 import mplfinance as mpf
 from datetime import datetime
 from CTkMessagebox import CTkMessagebox
-from matplotlib.pyplot import tight_layout
-
+from CTkToolTip import CTkToolTip
 from settings.config import ohlc_timeframes, ohlc_themes, plot_functions
 from utils.controls import IconButton, graphs_and_icons
 from api.coingecko import CoingeckoAPI
 from settings.current_state import current_state
-from utils.helpers import truncate_string, get_date_from_period
-
+from utils.helpers import truncate_string, get_date_from_period, validate_input
+from windows.help import HelpWindow
 
 coingecko = CoingeckoAPI()
 
@@ -26,7 +27,7 @@ customtkinter.set_appearance_mode("dark")
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-        self.geometry("1920x1080")
+        self.geometry("1800x900")
         self.title("Cryptolism")
         self.iconbitmap("img/cryptolism.ico")
         self.padding = 5
@@ -74,6 +75,23 @@ class App(customtkinter.CTk):
                                         variable=switch_var, onvalue="dark", offvalue="light")
         self.switch.grid(row=0, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
+        def graph_paper_out():
+            plt.savefig("graph.png")
+            os.startfile("graph.png", "print")
+
+        self.paper_out_button = customtkinter.CTkButton(self.top_frame, command=graph_paper_out, text='Распечатать график')
+        self.paper_out_button.grid(row=0, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
+
+        self.open_window_button = customtkinter.CTkButton(
+            self.top_frame,
+            text="Помощь",
+            command=self.open_help_window
+        )
+        self.open_window_button.grid(row=0, column=2, padx=self.padding, pady=self.padding, sticky="nsew")
+
+        self.help_window = None
+
+
 
 
         # Левая панель (Инструменты для графика)
@@ -83,6 +101,7 @@ class App(customtkinter.CTk):
             self.graph_button = IconButton(self.left_frame, graphs_and_icons[graph_type], partial(self.set_graph, graph_type),
                                            width=self.icon_size, height=self.icon_size)
             self.graph_button.pack(padx=self.padding, pady=self.padding)
+            self.graph_button_tooltip = CTkToolTip(self.graph_button, message=f"Отрисовка графика: {graph_type}")
 
 
 
@@ -97,19 +116,24 @@ class App(customtkinter.CTk):
         self.center_info_label.grid(row=0, column=0, padx=self.padding+10, pady=self.padding, sticky="W")
 
         self.center_frame_buttons = customtkinter.CTkFrame(self.center_frame)
-        self.center_frame_buttons.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew", columnspan=4)
+        self.center_frame_buttons.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
+
+        for i in range(6):  # 6 колонок (4 кнопки + entry + button)
+            self.center_frame_buttons.grid_columnconfigure(i, weight=1)
 
         for i, timeframe in enumerate(ohlc_timeframes):
             self.timeframe_button = customtkinter.CTkButton(self.center_frame_buttons, text=f"{timeframe} дн.",
                                                             command=partial(self.set_period, timeframe))
-            self.timeframe_button.grid(row=0, column=i, padx=self.padding, pady=self.padding)
+            self.timeframe_button.grid(row=0, column=i, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.time_search_entry = customtkinter.CTkEntry(self.center_frame_buttons, placeholder_text="Ввести диапазон: ")
-        self.time_search_entry.grid(row=0, column=4, padx=self.padding, pady=self.padding)
+        vcmd = (self.register(validate_input), '%P')
+
+        self.time_search_entry = customtkinter.CTkEntry(self.center_frame_buttons, placeholder_text="Ввести диапазон: ", validate="key", validatecommand=vcmd)
+        self.time_search_entry.grid(row=0, column=4, padx=self.padding, pady=self.padding, sticky="nsew")
 
         self.time_search_button = customtkinter.CTkButton(self.center_frame_buttons, text="Найти", command=lambda: self.set_period(
             int(self.time_search_entry.get())))
-        self.time_search_button.grid(row=0, column=5, padx=self.padding, pady=self.padding)
+        self.time_search_button.grid(row=0, column=5, padx=self.padding, pady=self.padding, sticky="nsew")
 
 
 
@@ -144,25 +168,32 @@ class App(customtkinter.CTk):
 
 
     def filter_buttons(self, event):
-        search_text = self.coin_search_entry.get().lower()  # Получаем текст из поля
+        search_text = self.coin_search_entry.get().lower()
         self.coins_list_frame._parent_canvas.yview_moveto(0)
 
-        # Если поле пустое — показываем ВСЕ кнопки
+
         if not search_text:
             for i, btn in enumerate(self.coins_buttons):
-                btn.grid(row=i, column=0, padx=self.padding, pady=self.padding)  # Восстанавливаем позицию
+                btn.grid(row=i, column=0, padx=self.padding, pady=self.padding)
             return
 
-        # Иначе фильтруем
+
         visible_row = 0
         for btn in self.coins_buttons:
-            btn_text = btn.cget("text").lower()  # Получаем текст кнопки
+            btn_text = btn.cget("text").lower()
 
             if search_text in btn_text:
-                btn.grid(row=visible_row, column=0, padx=self.padding, pady=self.padding)  # Показываем
-                visible_row += 1  # Увеличиваем ряд для следующей кнопки
+                btn.grid(row=visible_row, column=0, padx=self.padding, pady=self.padding)
+                visible_row += 1
             else:
-                btn.grid_remove()  # Скрываем (но сохраняем настройки grid)
+                btn.grid_remove()
+
+    def open_help_window(self):
+        """Открывает новое окно, если оно еще не открыто"""
+        if self.help_window is None or not self.help_window.winfo_exists():
+            self.help_window = HelpWindow(self)  # Создаем экземпляр нового окна
+        else:
+            self.help_window.focus()  # Если окно уже открыто, фокусируем его
 
 
     def set_graph(self, graph):
@@ -180,22 +211,18 @@ class App(customtkinter.CTk):
 
     def get_coin(self, coin, days=7):
         plt.close('all')
-        cached_data = self.cache_for_prices.get(f'{coin}{days}')
+        cache_key = f'{coin}{days}'
+        prices = self.cache_for_prices.get(cache_key)
 
-        if cached_data:
-            prices = cached_data
+        if prices:
             print(f'Данные взяты из кэша, текущий размер кэша: {getsizeof(self.cache_for_prices)}')
         else:
-            prices = coingecko.get_data_from_api(coin, days)
-            self.cache_for_prices[f'{coin}{days}'] = prices
+            prices = self.cache_for_prices[cache_key] = coingecko.get_data_from_api(coin, days)
             print('Данные получены с api и добавлены в кэш')
 
         xs = range(len(prices))
         ys = prices
-
-        price = Decimal(str(ys[-1]))
-        price = price.quantize(Decimal("1.00"))
-
+        price = Decimal(str(prices[-1])).quantize(Decimal("1.00"))
         figure = plt.figure(figsize=(18, 10), tight_layout=True)
         graph_color = 'green' if ys[0] < ys[-1] else 'red'
 
@@ -228,17 +255,25 @@ class App(customtkinter.CTk):
                 volume=False,
                 tight_layout=True,
             )
+            figure.suptitle(f'{current_state.coin} | {price}$', fontsize=14, y=0.9, x=0.9)
+
+
         elif current_state.graph == 'линейный':
             ax = figure.add_subplot(111)
             ax.plot(xs, ys, color=graph_color)
+
         else:
             figure = plot_functions[current_state.graph](prices, figure)
 
+        plt.title(f'{current_state.coin} | {price}$')
+
         self.center_info_label.configure(
-            text=f"{current_state.coin} | {price}$ | период: {get_date_from_period(current_state.period)} | график: {current_state.graph}")
+            text=f"период: {get_date_from_period(current_state.period)} | график: {current_state.graph}")
 
         canvas = FigureCanvasTkAgg(figure, master=self.center_frame)
         canvas.get_tk_widget().grid(row=1, column=0)
+
+
 
 app = App()
 app.mainloop()
