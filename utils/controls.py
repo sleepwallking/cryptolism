@@ -7,11 +7,11 @@ class IconButton(customtkinter.CTkButton):
         super().__init__(master, image=icon, text="", command=command, **kwargs)
 
 graphs_and_icons = {
-            'линейный':"img/chart_w.png",
-            'свечной':"img/candlestick_w.png",
-            'macd':"img/macd_w.png",
-            'sma':"img/sma_w.png",
-            'ema':"img/ema_w.png",
-            'rsi':"img/rsi_w.png",
-            'bb':"img/macd_w.png",
+            'линейный':"img/chart.png",
+            'свечной':"img/candlestick.png",
+            'macd':"img/macd.png",
+            'sma':"img/sma.png",
+            'ema':"img/ema.png",
+            'rsi':"img/rsi.png",
+            'bb':"img/macd.png",
         }
