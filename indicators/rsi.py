@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 import pandas as pd
-from settings.current_state import current_state
+from settings.actual import actual
 
 
 def plot_rsi(prices, figure, window=14):
@@ -28,7 +28,7 @@ def plot_rsi(prices, figure, window=14):
     ax2.axhline(70, color='red', linestyle='--')
     ax2.axhline(30, color='green', linestyle='--')
     ax2.set_ylim(0, 100)
-    ax2.set_title(f'RSI {current_state.period}')
+    ax2.set_title(f'RSI {actual.days}')
     ax2.legend()
 
     return figure

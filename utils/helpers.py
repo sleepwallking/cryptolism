@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
-
+from CTkMessagebox import CTkMessagebox
 from settings.config import coin_name_max_lenght
+from utils.messages import EMPTY_FIELD_ERROR_MSG, WRONG_VAR_ERROR_MSG
+
 
 def truncate_string(text):
     if len(text) > coin_name_max_lenght:
@@ -16,22 +18,17 @@ def get_date_from_period(days):
 
 def validate_input(text):
     if not text:
-        return True
-    try:
-        num = int(text)
-        return 1 <= num <= 365
-    except ValueError:
-        return False
+        CTkMessagebox(title="Ошибка ввода", message=EMPTY_FIELD_ERROR_MSG, icon="warning", option_1="Отмена")
+        return None
 
-# def check_entry_int_value(entry):
-#     try:
-#         value = int(entry.get())
-#         if 0 < value < 365:
-#             return value
-#         else:
-#             msg = CTkMessagebox(title="Ошибка ввода", message=f"Введенное значение должно быть больше 0 и меньше 365",
-#                                 icon="info", option_1="Отмена")
-#     except ValueError:
-#         # Обработка ошибки, например, установка значения по умолчанию или сообщение пользователю
-#         print("Пожалуйста, введите целое число")
-#         return 0  # или другое значение по умолчанию
+    try:
+        number = int(text)
+        if 1 <= number <= 365:
+            return number # Подходящее под условия значение возвращается сразу
+    except ValueError:
+        pass
+
+    CTkMessagebox(title="Ошибка ввода", message=WRONG_VAR_ERROR_MSG, icon="warning", option_1="Отмена")
+    return None
+
+

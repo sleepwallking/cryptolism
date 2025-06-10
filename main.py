@@ -1,5 +1,6 @@
 import os
-import customtkinter
+import customtkinter as ctk
+from customtkinter import filedialog
 import matplotlib.pyplot as plt
 import mplcursors
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -14,41 +15,42 @@ from CTkToolTip import CTkToolTip
 from settings.config import ohlc_timeframes, ohlc_themes, plot_functions
 from utils.controls import IconButton, graphs_and_icons
 from api.coingecko import CoingeckoAPI
-from settings.current_state import current_state
+from settings.actual import actual
 from utils.helpers import truncate_string, get_date_from_period, validate_input
 from utils.messages import CANDLE_CHART_ERROR_MSG, PRINT_OUT_INFO_MSG
 from windows.help import HelpWindow
 
 coingecko = CoingeckoAPI()
 
-customtkinter.set_default_color_theme("dark-blue")
-customtkinter.set_appearance_mode("dark")
+ctk.set_default_color_theme("dark-blue")
+ctk.set_appearance_mode("light")
+plt.style.use('default')
 
 
-class App(customtkinter.CTk):
+class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.geometry("1800x900")
         self.title("Cryptolism")
-        self.iconbitmap("img/cryptolism.ico")
+        self.iconbitmap("resources/img/cryptolism.ico")
         self.padding = 5
         self.icon_size = 40
         self.font_bold = ("Segoe UI", 18, "normal")
         self.minsize(width=900, height=460)
 
-        plt.style.use('dark_background')
+
 
         # Панели
-        self.top_frame = customtkinter.CTkFrame(self, height=30)
+        self.top_frame = ctk.CTkFrame(self, height=30)
         self.top_frame.grid(row=0, column=0, padx=self.padding, pady=(self.padding, 0), sticky="ew", columnspan=3)
 
-        self.left_frame = customtkinter.CTkScrollableFrame(self, width=50)
+        self.left_frame = ctk.CTkScrollableFrame(self, width=50)
         self.left_frame.grid(row=1, column=0, padx=(self.padding, 0), pady=self.padding, sticky='nsew')
 
-        self.center_frame = customtkinter.CTkFrame(self)
+        self.center_frame = ctk.CTkFrame(self)
         self.center_frame.grid(row=1, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.right_frame = customtkinter.CTkFrame(self)
+        self.right_frame = ctk.CTkFrame(self)
         self.right_frame.grid(row=1, column=2, padx=(0, self.padding), pady=self.padding, sticky="nsew")
 
         self.grid_columnconfigure(1, weight=1)
@@ -61,38 +63,46 @@ class App(customtkinter.CTk):
         def switch_event():
             theme = switch_var.get()
             if theme == 'light':
-                customtkinter.set_appearance_mode('light')
+                ctk.set_appearance_mode('light')
                 plt.style.use('default')
-                current_state.theme = 'light'
+                actual.theme = 'light'
             else:
-                customtkinter.set_appearance_mode('dark')
+                ctk.set_appearance_mode('dark')
                 plt.style.use('dark_background')
-                current_state.theme = 'dark'
+                actual.theme = 'dark'
 
-            self.set_coin(current_state.coin)
+            self.set_coin(actual.coin)
 
-        switch_var = customtkinter.StringVar(value="dark")
-        self.switch = customtkinter.CTkSwitch(self.top_frame, text="Смена темы", command=switch_event,
+        switch_var = ctk.StringVar(value="light")
+        self.switch = ctk.CTkSwitch(self.top_frame, text="Смена темы", command=switch_event,
                                         variable=switch_var, onvalue="dark", offvalue="light")
         self.switch.grid(row=0, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
         def graph_paper_out():
-            filename = f'{current_state.coin}_{current_state.period}_{current_state.graph}.png'
+            print_out_info_msg = CTkMessagebox(title="Печать графика", message=PRINT_OUT_INFO_MSG,
+                                                   icon="info", option_1="Отмена", option_2="Выбрать путь сохранения")
+            response = print_out_info_msg.get()
 
-            plt.savefig(filename)
-            os.startfile(filename, "print")
+            if response == "Выбрать путь сохранения":
+                filename = f'{actual.coin}_{actual.days}_{actual.graph}.png'
+                filepath = filedialog.asksaveasfilename(
+                    defaultextension=".png",
+                    filetypes=[("PNG files", "*.png"), ("All files", "*.*")],
+                    title="Сохранить график как...",
+                    initialfile = filename
+                )
+                if filepath:
+                    plt.savefig(filepath)
+                    os.startfile(filepath, "print")
 
-            filepath = os.path.join(os.getcwd(), filename)
-            # print("Файл сохранён по пути:", filepath)
-
-            print_out_info_msg = CTkMessagebox(title="Печать графика", message=PRINT_OUT_INFO_MSG+filepath,
-                                                   icon="info", option_1="Отмена")
 
 
-        self.paper_out_button = customtkinter.CTkButton(self.top_frame, command=graph_paper_out, text='Распечатать график')
+
+
+        self.paper_out_button = ctk.CTkButton(self.top_frame, command=graph_paper_out, text='Распечатать график')
         self.paper_out_button.grid(row=0, column=1, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.open_window_button = customtkinter.CTkButton(
+        self.open_window_button = ctk.CTkButton(
             self.top_frame,
             text="Помощь",
             command=self.open_help_window
@@ -100,6 +110,13 @@ class App(customtkinter.CTk):
         self.open_window_button.grid(row=0, column=2, padx=self.padding, pady=self.padding, sticky="nsew")
 
         self.help_window = None
+
+
+        currency_combobox_var = ctk.StringVar(value="rub")
+        self.currency_combobox = ctk.CTkComboBox(self.top_frame, values=["usd", "eur", "rub", "cny", "gbp"],
+                                             command=self.set_currency, variable=currency_combobox_var)
+        self.currency_combobox.grid(row=0, column=3, padx=self.padding, pady=self.padding, sticky="nsew")
+
 
 
 
@@ -122,27 +139,30 @@ class App(customtkinter.CTk):
         self.center_frame.grid_rowconfigure(2, weight=0)
         self.center_frame.grid_columnconfigure(0, weight=1)
 
-        self.center_info_label = customtkinter.CTkLabel(self.center_frame, font=self.font_bold)
+        self.center_info_label = ctk.CTkLabel(self.center_frame, font=self.font_bold)
         self.center_info_label.grid(row=0, column=0, padx=self.padding+10, pady=self.padding, sticky="W")
 
-        self.center_frame_buttons = customtkinter.CTkFrame(self.center_frame)
+        self.center_frame_buttons = ctk.CTkFrame(self.center_frame)
         self.center_frame_buttons.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
         for i in range(6):  # 6 колонок (4 кнопки + entry + button)
             self.center_frame_buttons.grid_columnconfigure(i, weight=1)
 
         for i, timeframe in enumerate(ohlc_timeframes):
-            self.timeframe_button = customtkinter.CTkButton(self.center_frame_buttons, text=f"{timeframe} дн.",
+            self.timeframe_button = ctk.CTkButton(self.center_frame_buttons, text=f"{timeframe} дн.",
                                                             command=partial(self.set_period, timeframe))
             self.timeframe_button.grid(row=0, column=i, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        vcmd = (self.register(validate_input), '%P')
-
-        self.time_search_entry = customtkinter.CTkEntry(self.center_frame_buttons, placeholder_text="Ввести диапазон: ", validate="key", validatecommand=vcmd)
+        self.time_search_entry = ctk.CTkEntry(self.center_frame_buttons, placeholder_text="Ввести диапазон: ")
         self.time_search_entry.grid(row=0, column=4, padx=self.padding, pady=self.padding, sticky="nsew")
 
-        self.time_search_button = customtkinter.CTkButton(self.center_frame_buttons, text="Найти", command=lambda: self.set_period(
-            int(self.time_search_entry.get())))
+        def time_search_entry_validate():
+            valid_number = validate_input(self.time_search_entry.get())
+            if valid_number:
+                self.set_period(valid_number)
+
+
+        self.time_search_button = ctk.CTkButton(self.center_frame_buttons, text="Найти", command=time_search_entry_validate)
         self.time_search_button.grid(row=0, column=5, padx=self.padding, pady=self.padding, sticky="nsew")
 
 
@@ -151,14 +171,14 @@ class App(customtkinter.CTk):
 
         self.right_frame.grid_rowconfigure(2, weight=1)
 
-        self.coin_list_label = customtkinter.CTkLabel(self.right_frame, text='Список криптовалют')
+        self.coin_list_label = ctk.CTkLabel(self.right_frame, text='Список криптовалют')
         self.coin_list_label.grid(row=0, column=0)
 
-        self.coin_search_entry = customtkinter.CTkEntry(self.right_frame, placeholder_text="Найти монету:")
+        self.coin_search_entry = ctk.CTkEntry(self.right_frame, placeholder_text="Найти монету:")
         self.coin_search_entry.grid(row=1, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
         self.coin_search_entry.bind("<KeyRelease>", self.filter_buttons)
 
-        self.coins_list_frame = customtkinter.CTkScrollableFrame(self.right_frame, width=150)
+        self.coins_list_frame = ctk.CTkScrollableFrame(self.right_frame, width=150)
         self.coins_list_frame.grid(row=2, column=0, padx=self.padding, pady=self.padding, sticky="nsew")
 
         coins = coingecko.get_coin_list()
@@ -166,7 +186,7 @@ class App(customtkinter.CTk):
         self.coins_buttons = []
 
         for i, coin in enumerate(coins):
-            self.coin_button = customtkinter.CTkButton(self.coins_list_frame, text=truncate_string(coin),
+            self.coin_button = ctk.CTkButton(self.coins_list_frame, text=truncate_string(coin),
                                                        command=partial(self.set_coin, coin))
             self.coin_button.grid(row=i, column=0, padx=self.padding, pady=self.padding)
             self.coins_buttons.append(self.coin_button)
@@ -199,18 +219,22 @@ class App(customtkinter.CTk):
 
 
     def set_graph(self, graph):
-        current_state.graph = graph
-        self.get_coin(current_state.coin, current_state.period)
+        actual.graph = graph
+        self.get_coin()
 
     def set_coin(self, coin):
-        current_state.coin = coin
-        self.get_coin(current_state.coin, current_state.period)
+        actual.coin = coin
+        self.get_coin()
 
     def set_period(self, days):
-        current_state.period = days
-        self.get_coin(current_state.coin, current_state.period)
+        actual.days = days
+        self.get_coin()
 
-    def get_coin(self, coin, days=7):
+    def set_currency(self, currency):
+        actual.currency = currency
+        self.get_coin()
+
+    def get_coin(self):
         # Закрываем все предыдущие графики
         plt.close('all')
 
@@ -218,13 +242,16 @@ class App(customtkinter.CTk):
         if hasattr(self, 'current_canvas'):
             self.current_canvas.get_tk_widget().destroy()
 
-        cache_key = f'{coin}{days}'
+        coin = actual.coin
+        days = actual.days
+
+        cache_key = f'{coin}{days}{actual.currency}'
         prices = self.cache_for_prices.get(cache_key)
 
         if prices:
             print(f'Данные взяты из кэша, текущий размер кэша: {getsizeof(self.cache_for_prices)}')
         else:
-            prices = self.cache_for_prices[cache_key] = coingecko.get_data_from_api(coin, days)
+            prices = self.cache_for_prices[cache_key] = coingecko.get_data_from_api(coin, days, actual.currency)
             print('Данные получены с api и добавлены в кэш')
 
         xs = range(len(prices))
@@ -233,11 +260,11 @@ class App(customtkinter.CTk):
         figure = plt.figure(figsize=(18, 10), tight_layout=True)
         graph_color = 'green' if ys[0] < ys[-1] else 'red'
 
-        if current_state.graph == "свечной":
+        if actual.graph == "свечной":
             if days not in ohlc_timeframes:
-                days = current_state.period = 7
-                candle_chart_error_msg = CTkMessagebox(title="Ошибка ввода", message=CANDLE_CHART_ERROR_MSG,
-                                                       icon="error", option_1="Отмена")
+                days = actual.days = 7
+                candle_chart_error_msg = CTkMessagebox(title="Ограничение ввода", message=CANDLE_CHART_ERROR_MSG,
+                                                       icon="info", option_1="Отмена")
 
             ohlc = coingecko.get_ohlc_data_from_api(coin, days)
             data = []
@@ -251,25 +278,25 @@ class App(customtkinter.CTk):
             figure, ax = mpf.plot(
                 df,
                 type='candle',
-                style=ohlc_themes[current_state.theme],
+                style=ohlc_themes[actual.theme],
                 returnfig=True,
                 figsize=(18, 10),
                 volume=False,
                 tight_layout=True,
             )
-            figure.suptitle(f'{current_state.coin} | {price}$', fontsize=14, y=0.9, x=0.9)
+            figure.suptitle(f'{actual.coin} | {price} {actual.currency}', fontsize=14, y=0.9, x=0.9)
 
-        elif current_state.graph == 'линейный':
+        elif actual.graph == 'линейный':
             ax = figure.add_subplot(111)
             ax.plot(xs, ys, color=graph_color)
 
         else:
-            figure = plot_functions[current_state.graph](prices, figure)
+            figure = plot_functions[actual.graph](prices, figure)
 
-        plt.title(f'{current_state.coin} | {price}$')
+        plt.title(f'{actual.coin} | {price} {actual.currency}')
 
         self.center_info_label.configure(
-            text=f"период: {get_date_from_period(current_state.period)} | график: {current_state.graph}")
+            text=f"период: {get_date_from_period(actual.days)} | график: {actual.graph}")
 
         # Сохраняем ссылку на текущий canvas
         self.current_canvas = FigureCanvasTkAgg(figure, master=self.center_frame)

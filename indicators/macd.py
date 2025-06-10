@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from settings.current_state import current_state
+from settings.actual import actual
 
 
 def plot_macd(prices, figure):

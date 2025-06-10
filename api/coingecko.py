@@ -11,7 +11,8 @@ class CoingeckoAPI:
     def __init__(self):
         self.headers = {
             "accept": "application/json",
-            "x-cg-demo-api-key": os.getenv("COINGECKO_API_KEY")
+            # "x-cg-demo-api-key": os.getenv("COINGECKO_API_KEY")
+            "x-cg-demo-api-key": "CG-Ps41T1Nu1VEWKv3JXbjtZQmQ"
         }
 
     def get_coin_list(self):
@@ -35,7 +36,7 @@ class CoingeckoAPI:
 
         except Exception as ex:
             msg = CTkMessagebox(title="Ошибка!", message=f"{ex}",
-                                icon="warning", option_1="Отмена")
+                                icon="info", option_1="Отмена")
 
 
 
